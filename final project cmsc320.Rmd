@@ -1,0 +1,97 @@
+---
+title: "CMSC320 Final Project"
+author: "John Walden"
+date: "5/17/2018"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+NBA Player Efficiency Analysis
+
+Introduction
+In the following tutorial, we will use a database which contains raw stats for NBA players in the 2015-2016 season. All common NBA metrics are shown for each player in the league. The most commonly used statistical benchmark for comparing the overall value of players in the NBA is efficiency, which is derived from the basic individual statistics of points, rebounds, assists, steals, blocks, turnovers and shot attempts.  In the current 2017-2018, LeBron James is having what many consider to be the best season of his career at age 33, which is considered by most to be past an athlete's athletic prime.  Knowing this, I was curious to analyze and model the relationship between age and player efficiency.
+
+Before we begin our analysis, we must import the appropriate packages.  It's not necessary to put the packages in a separate R snippet like this, but I find it provides more clarity when checking back to see if you have the correct packages installed.
+
+```{r libraries}
+library(tidyverse)
+library(rvest)
+library(broom)
+```
+
+The next basic step after downloading the appropriate packages is to import the data.  The raw data can be found in the link provided below, and we use the read.csv function to encapsulate that within the 'url' which we then copy into our database variable db.
+
+```{r read}
+url <- read.csv("https://raw.githubusercontent.com/AddisonGauss/NbaData2015-2016/master/NBApoints.csv")
+
+db <- url
+
+df <- db
+df %>%
+  head()
+```
+
+Above we then see the first 6 rows of the database.  The 476 rows correspond to the 476 players who played in an NBA game in the 2015-2016 season, and the 30 columns correspond to the represented metric.  The players in this original database are sorted by points per game, and unsurprisingly, the league leader in PPG, Steph Curry, went on to be the unanimous league MVP.
+
+
+Next we will tidy the database.  We make a new category which we'll label "efficiency" using the metric of blocks + points + rebounds + assists + steals - misses - free throw misses - turnovers.  We'll then select the players by their name, age, position, and efficiency, and then sort them by their efficiency.
+
+```{r pt2}
+tidied_df <- db %>%
+mutate(efficiency = (BLK + PS.G. + DRB + ORB + AST + STL - (FGA - FG) - (FTA - FT) - TOV)) %>%
+select(Player, Pos, Age, efficiency) %>%
+arrange(desc(efficiency))
+```
+
+Next we will make a graph using the ggplot function.  We'll graph age on the X-axis and efficiency on the Y-axis, and use points to represent individual players.
+
+```{r pt3}
+tidied_df %>%
+ggplot(aes(x = Age, y = efficiency)) +
+  geom_point()
+```
+
+We will now make three more graphs to briefly check a potential relationship between position and efficiency.  The efficiency statistic ends up not biasing any particular position too heavily because centers naturally get more rebounds, while guards naturally get more assists.  A common criticism of efficiency is how it only focuses on the offensive side of the game, but defensive metrics are much more complicated to calculate and can often be subjective.
+
+```{r pt4}
+tidied_df %>%
+  filter(Pos == "PG") %>%
+ggplot(aes(x = Age, y = efficiency, group = Pos)) + 
+  geom_point(aes(color=Pos))
+```
+
+```{r pt5}
+tidied_df %>%
+  filter(Pos == "C") %>%
+ggplot(aes(x = Age, y = efficiency, group = Pos)) + 
+  geom_point(aes(color=Pos))
+```
+
+```{r pt6}
+tidied_df %>%
+  filter(Pos == "C" | Pos == "PG") %>%
+ggplot(aes(x = Age, y = efficiency, group = Pos)) + 
+  geom_point(aes(color=Pos))
+```
+
+Regression
+
+The regression we're doing looks for a relationship between on-court efficiency and age.  We predict that players peak at a specific age and decline gradually afterwards, therefore we can model our linear regression as a polynomial formula.
+
+```{r pt7}
+model <- lm(efficiency ~ Age + I(Age^2),tidied_df)
+
+model %>%
+  tidy()
+```
+
+We see from the model above that every additional year in age increases efficiency by approximately 2.17 - 2(.038) * Age until around 29 years of Age when efficiency starts to decline, unless your name is LeBron James.  Cavs in fo.
+
+```{r pt8}
+model %>%
+    augment() %>%
+    ggplot(aes(x=Age, y=.fitted)) +
+        geom_point() +
+        labs(title="Actual vs Residuals", x = "Actual", y = "Residuals")
+```
